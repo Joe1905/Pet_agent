@@ -1,5 +1,9 @@
 # Local Pet
 
+A cute cross-platform desktop pet assistant application with AI-powered conversation, tool calling, memory system, and web access mode.
+
+---
+
 一个可爱的跨平台桌面宠物助手应用，支持 AI 智能对话、工具调用、记忆系统和 Web 访问模式。
 
 ## 功能特点
