@@ -1,14 +1,401 @@
-# Local Pet
-
-A cute cross-platform desktop pet assistant application with AI-powered conversation, tool calling, memory system, and web access mode.
+# Pet_Agent
 
 ---
 
-一个可爱的跨平台桌面宠物助手应用，支持 AI 智能对话、工具调用、记忆系统和 Web 访问模式。
+## English
 
-## 功能特点
+### Features
 
-### 桌面宠物应用
+#### Desktop Pet Application
+- 🐾 **Multi-character Pets**: Switch between different pet avatars (catgirl, loyal dog, etc.), each with unique personality and conversation style
+- 💬 **Intelligent Conversation**: Natural language interaction powered by LLM with streaming response support
+- 🔧 **Tool Calling**: Pets can call various tools (alarm clock, timer, weather query, web browsing, etc.)
+- 💾 **Memory System**: Automatically summarize chat content, remember owner's preferences, hobbies, and important dates
+- 🎨 **Interface Customization**: Customize pet appearance, name, and conversation themes
+- 📊 **Affection System**: Increase intimacy with pets through continuous interaction
+
+#### Web Service
+- 🌐 **Browser Access**: Interact with pets via browser, suitable for environments without desktop
+- 📱 **Responsive Design**: Adapts to different screen sizes
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                          Client                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────┐           ┌─────────────────┐             │
+│  │  Desktop App    │           │   Web Frontend  │             │
+│  │   (PySide6)     │           │   (HTML/JS)      │             │
+│  │                 │           │                  │             │
+│  │  ┌───────────┐ │           │   FastAPI       │             │
+│  │  │ ChatAgent │ │           │   Server         │             │
+│  │  │ (Singleton)│ │           │  (web/server.py) │             │
+│  │  └─────┬─────┘ │           └────────┬────────┘             │
+│  │        │ HTTP   │                     │                      │
+│  │        │ Request │                     │ HTTP Proxy          │
+│  └────────┼────────┘                     │                      │
+│           │                               │                      │
+└───────────┼───────────────────────────────┼──────────────────────┘
+            │                               │
+            ▼                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        Server Side                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              FastAPI Server (rag_server.py)              │    │
+│  │                                                          │    │
+│  │  ┌──────────────┐   ┌──────────────┐   ┌────────────┐  │    │
+│  │  │   Chat API   │   │   RAG        │   │  Tavily    │  │    │
+│  │  │   Routes     │   │  (Milvus)    │   │  Search    │  │    │
+│  │  └──────┬───────┘   └──────┬───────┘   └────────────┘  │    │
+│  │         │                   │                           │    │
+│  │         └───────────┬───────┘                           │    │
+│  │                     ▼                                     │    │
+│  │              ┌──────────────┐                           │    │
+│  │              │   LangChain  │                           │    │
+│  │              │   Chain      │                           │    │
+│  │              └──────┬───────┘                           │    │
+│  │                     │                                    │    │
+│  └─────────────────────┼────────────────────────────────────┘    │
+│                        ▼                                         │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                   vLLM (Qwen3-30B)                       │    │
+│  │                   Locally Deployed LLM                   │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Tech Stack
+
+#### Client
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| UI Framework | PySide6 | Qt for Python, cross-platform desktop UI |
+| HTTP Client | requests | Remote service communication |
+| Automation | PyAutoGUI | Mouse and keyboard operations in tool calls |
+| System Tools | ctypes, subprocess | DPI awareness, system command execution |
+
+#### Server
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| Web Framework | FastAPI | High-performance Python web framework |
+| LLM Inference | vLLM | Qwen3-30B-A3B-GPTQ-Int4 |
+| Vector Database | Milvus | RAG retrieval augmentation |
+| Embedding | HuggingFace | all-MiniLM-L6-v2 |
+| Prompt Framework | LangChain | Chain composition and retrieval |
+| Web Search | Tavily | Real-time information retrieval |
+
+### Project Structure
+
+```
+local_pet/
+├── src/                           # Desktop app main directory
+│   ├── main.py                    # App entry, desktop pet main window
+│   ├── link_model.py              # Model connection layer
+│   │   ├── ChatAgent              # Conversation agent (singleton)
+│   │   │   ├── Streaming          # ask_stream() with SSE support
+│   │   │   │   dialogue processing
+│   │   │   ├── Tool call         # XML tag format parsing
+│   │   │   │   parsing
+│   │   │   ├── Memory            # update_history_memory()
+│   │   │   │   summarization
+│   │   │   └── System prompt     # update_system_prompt()
+│   │   │       management
+│   │   └── LocalLLM              # HTTP client
+│   ├── window_tool.py             # Tool executor (singleton)
+│   │   ├── open_app()            # Launch applications
+│   │   ├── type_text()           # Simulate keyboard input
+│   │   ├── click()               # Mouse click
+│   │   ├── run_shell()           # Execute shell commands
+│   │   ├── press_keys()          # Hotkey operations
+│   │   ├── open_url()           # Open URLs
+│   │   ├── get_current_address() # Get current location
+│   │   ├── get_today_weather()  # Query today's weather
+│   │   ├── get_future_weather() # Query weather forecast
+│   │   ├── get_current_time()   # Get current time
+│   │   └── get_holiday_json()   # Query lunar holidays
+│   ├── file_load.py               # Resource config loader
+│   │   └── ResourceExtractor     # Handle packaged resource paths
+│   ├── string_manager.py          # Multi-language string manager
+│   ├── logger.py                  # Logging module
+│   ├── ai_agent.py               # AI Agent (reserved)
+│   ├── config/                   # Config files
+│   │   ├── setting.ini           # Main config
+│   │   │   ├── [Url]            # Server address
+│   │   │   ├── [SessionID]      # Session ID
+│   │   │   ├── [General_Set]    # Current pet index
+│   │   │   ├── [Memory]         # Memory storage
+│   │   │   └── [Nick_Name]      # Pet nickname
+│   │   ├── pet_config_private.ini # Pet appearance config
+│   │   ├── string_table.json     # Dialogue templates & role definitions
+│   │   └── holiday.json          # Holiday data
+│   ├── ui/                       # UI modules
+│   │   ├── mainUi.py            # Main window UI
+│   │   ├── chat_ui.py           # Chat interface
+│   │   ├── favor.py             # Affection management
+│   │   ├── login.py             # Login window
+│   │   ├── memoryDialog.py      # Memory editor
+│   │   ├── messageInfo.py       # Message list model
+│   │   ├── messageUi.py         # Message bubble component
+│   │   └── loadingUi.py         # Loading animation overlay
+│   ├── pet_image/               # Pet animation resources
+│   │   └── model1.gif           # Pet GIF animation
+│   └── package.bat              # Nuitka packaging script
+│
+├── backend/                      # Server-side code
+│   └── rag-milvus-project/
+│       ├── rag_server.py         # FastAPI main service
+│       │   ├── /chat            # Chat endpoint (streaming)
+│       │   ├── /clear_history   # Clear session history
+│       │   └── /debug_history   # Debug endpoint
+│       ├── rag_chat.py          # RAG Chain implementation
+│       ├── ingest_data.py       # Vector data import
+│       ├── milvus_demo.db       # SQLite metadata storage
+│       ├── system_prompt.json   # System prompt config
+│       └── requirements.txt     # Python dependencies
+│
+├── web/                          # Web frontend
+│   ├── server.py                 # FastAPI service
+│   │   ├── /api/config          # Get config
+│   │   ├── /api/favor/list      # Pet list & affection
+│   │   ├── /api/favor/select   # Switch pet
+│   │   └── /api/favor/reset    # Reset settings
+│   ├── index.html               # Main page
+│   ├── components.js            # Frontend components
+│   ├── window_tool.py          # Web version tools
+│   └── config/                 # Web config
+│
+├── README.md
+└── .gitignore
+```
+
+### Core Modules
+
+#### ChatAgent Conversation Flow
+
+```
+User Input
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  1. Check for Image                 │
+│     - Extract <question>image:path  │
+│     - Base64 encode and send        │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  2. Send Request to vLLM Server     │
+│     POST /chat                      │
+│     - question: User question       │
+│     - session_id: Session ID       │
+│     - character: Current role key   │
+│     - memory: Memory context       │
+│     - image: Base64 image data     │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  3. Parse Streaming Response       │
+│     - <think> Thinking process      │
+│     - <tool> Tool call instruction │
+│     - <observation> Tool result    │
+│     - <final answer> Final answer  │
+└─────────────────┬───────────────────┘
+                  │
+          ┌───────┴───────┐
+          ▼               ▼
+┌─────────────┐   ┌─────────────┐
+│  Needs Tool │   │ Direct      │
+│  Call       │   │ Answer      │
+└──────┬──────┘   └──────┬──────┘
+       ▼                 │
+┌─────────────┐          │
+│ WindowTool  │          │
+│ Execute     │          │
+└──────┬──────┘          │
+       ▼                 │
+       └────────┬────────┘
+                ▼
+        Display Final Answer
+```
+
+#### Tool Calling Protocol
+
+The pet communicates with backend using XML tags. Examples:
+
+```
+# When setting an alarm
+<tool>to_set_clock_alarm("06:30")</tool>
+
+# After tool execution
+<observation>Alarm set for 06:30</observation>
+
+# Final answer
+<final answer>Your alarm is set! Remember to wake up on time~</final answer>
+```
+
+#### Memory System
+
+```
+┌─────────────┐   Scheduled    ┌─────────────┐
+│ Chat Logs   │ ──────────────▶│ LLM Summary │
+│ (logs/*.txt)│                │ Extract prefs│
+└─────────────┘                └──────┬──────┘
+                                       │
+                                       ▼
+                              ┌─────────────┐
+                              │ setting.ini │
+                              │ [Memory]    │
+                              │ current_    │
+                              │ memory      │
+                              └─────────────┘
+```
+
+### Configuration
+
+#### Client Config (src/config/setting.ini)
+
+```ini
+[Url]
+server_url = http://101.43.33.48:43351  # Remote vLLM server address
+
+[SessionID]
+id = "user001"                          # Session unique ID
+
+[General_Set]
+current_index = 2                        # Current pet index (1=Liubai, 2=Qirui)
+
+[Nick_Name]
+nickname1 = Liubai                       # Pet nickname
+nickname2 = Qirui
+
+[Memory]
+current_memory = Owner: likes badminton; hates tomatoes  # Memory summary
+current_file =                          # Current log file index
+```
+
+#### Role Config (src/config/string_table.json)
+
+| Key | Description |
+|-----|-------------|
+| `Character_1` | Catgirl role: tsundere but kindhearted, silver-white fur, blue eyes |
+| `Character_2` | Loyal dog role: sincere and soft, black fur, golden eyes |
+| `Extra_Rule` | General rules: tool call format, thinking process |
+| `New_Character_*` | Web simplified role definition |
+| `Summary_Prompt` | Memory summarization prompt template |
+
+### Running
+
+#### Requirements
+- Python 3.8+
+- Conda environment (recommended)
+- Windows 10/11 (desktop app)
+- Network access to remote server
+
+#### Desktop App
+```bash
+# Activate Conda environment
+conda activate local_pet
+
+# Enter src directory
+cd src
+
+# Run app
+python main.py
+```
+
+#### Web Service
+```bash
+# Enter web directory
+cd web
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run service
+python server.py
+
+# Access http://localhost:8000
+```
+
+#### Backend (Server Deployment)
+```bash
+cd backend/rag-milvus-project
+
+# Start vLLM (requires pre-deployment)
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen3-30B-A3B-GPTQ-Int4 \
+    --host localhost --port 8001
+
+# Start RAG service
+python rag_server.py
+```
+
+### Build & Package
+
+```bash
+cd src
+
+# Run packaging script (requires Conda env)
+python package.bat
+
+# Output: build/main.dist/main.exe
+```
+
+Package options:
+- `--standalone`: Standalone package with all dependencies
+- `--enable-plugin=pyside6`: Enable PySide6 plugin
+- `--windows-console-mode=force`: Keep console (for debugging)
+- `--lto=yes`: Link-time optimization
+
+### Dependencies
+
+#### Client (src/requirements.txt)
+```
+PySide6>=6.5.0
+requests>=2.28.0
+pyautogui>=0.4.14
+pygetwindow>=0.0.9
+lunar-python>=1.15
+chardet>=4.0.0
+```
+
+#### Backend (backend/rag-milvus-project/requirements.txt)
+```
+fastapi>=0.100.0
+uvicorn>=0.23.0
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-openai>=0.0.2
+langchain-huggingface>=0.0.1
+langchain-milvus>=0.0.1
+pymilvus>=2.3.0
+huggingface-hub>=0.19.0
+tavily-python>=0.3.0
+```
+
+#### Web (web/requirements.txt)
+```
+fastapi>=0.100.0
+uvicorn>=0.23.0
+```
+
+### License
+
+MIT License
+
+---
+
+## 中文
+
+### 功能特点
+
+#### 桌面宠物应用
 - 🐾 **多角色宠物**：支持切换不同宠物形象（猫娘、忠犬等），每种角色有独特的性格和对话风格
 - 💬 **智能对话**：基于大语言模型的自然语言交互，支持流式响应
 - 🔧 **工具调用**：宠物可调用多种工具（闹钟、定时器、天气查询、网页打开等）
@@ -16,63 +403,64 @@ A cute cross-platform desktop pet assistant application with AI-powered conversa
 - 🎨 **界面定制**：支持自定义宠物外观、名称和对话主题
 - 📊 **好感度系统**：通过持续互动提升与宠物的亲密度
 
-### Web 服务
+#### Web 服务
 - 🌐 **浏览器访问**：可通过浏览器与宠物互动，适合无桌面环境的场景
 - 📱 **响应式设计**：适配不同屏幕尺寸
 
-## 系统架构
+### 系统架构
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        客户端 (Client)                          │
+│                          客户端                                  │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────────┐           ┌─────────────────┐            │
-│  │   桌面应用 (PySide6) │         │   Web 前端 (HTML/JS) │        │
-│  │                   │           │                     │        │
-│  │  ┌─────────────┐  │           │   FastAPI Server    │        │
-│  │  │ ChatAgent   │  │           │   (web/server.py)   │        │
-│  │  │ (单例模式)   │  │           │                     │        │
-│  │  └──────┬──────┘  │           └──────────┬──────────┘        │
-│  │         │ HTTP     │                     │                   │
-│  │         │ 请求     │                     │ HTTP 代理          │
-│  └─────────┼─────────┘                     │                   │
-│            │                               │                   │
-└────────────┼───────────────────────────────┼───────────────────┘
-             │                               │
-             ▼                               ▼
+│                                                                  │
+│  ┌─────────────────┐           ┌─────────────────┐             │
+│  │   桌面应用      │           │   Web 前端       │             │
+│  │   (PySide6)     │           │   (HTML/JS)     │             │
+│  │                 │           │                  │             │
+│  │  ┌───────────┐ │           │   FastAPI        │             │
+│  │  │ ChatAgent │ │           │   Server         │             │
+│  │  │ (单例模式) │ │           │  (web/server.py)│             │
+│  │  └─────┬─────┘ │           └────────┬────────┘             │
+│  │        │ HTTP   │                     │                      │
+│  │        │ 请求   │                     │ HTTP 代理            │
+│  └────────┼────────┘                     │                      │
+│           │                               │                      │
+└───────────┼───────────────────────────────┼──────────────────────┘
+            │                               │
+            ▼                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      服务器端 (Server)                          │
+│                        服务器端                                  │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │              FastAPI Server (rag_server.py)              │   │
-│  │                                                          │   │
-│  │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐  │   │
-│  │  │   Chat API  │   │   RAG 检索   │   │  Tavily     │  │   │
-│  │  │   路由      │   │  (Milvus)    │   │  联网搜索   │  │   │
-│  │  └──────┬──────┘   └──────┬──────┘   └──────────────┘  │   │
-│  │         │                 │                           │   │
-│  │         └────────────┬─────┘                           │   │
-│  │                      ▼                                 │   │
-│  │              ┌──────────────┐                         │   │
-│  │              │   LangChain  │                         │   │
-│  │              │   Chain     │                         │   │
-│  │              └──────┬──────┘                         │   │
-│  │                     │                                │   │
-│  └─────────────────────┼──────────────────────────────────┘   │
-│                        ▼                                      │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                   vLLM (Qwen3-30B)                      │   │
-│  │                   本地部署的 LLM 服务                     │   │
-│  └─────────────────────────────────────────────────────────┘   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              FastAPI Server (rag_server.py)              │    │
+│  │                                                          │    │
+│  │  ┌──────────────┐   ┌──────────────┐   ┌────────────┐    │    │
+│  │  │   Chat API   │   │   RAG 检索   │   │  Tavily   │    │    │
+│  │  │   路由       │   │  (Milvus)    │   │  联网搜索 │    │    │
+│  │  └──────┬───────┘   └──────┬───────┘   └────────────┘    │    │
+│  │         │                 │                            │    │
+│  │         └───────────┬─────┘                            │    │
+│  │                     ▼                                  │    │
+│  │              ┌──────────────┐                          │    │
+│  │              │   LangChain  │                          │    │
+│  │              │   Chain      │                          │    │
+│  │              └──────┬───────┘                          │    │
+│  │                     │                                   │    │
+│  └─────────────────────┼───────────────────────────────────┘    │
+│                        ▼                                        │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                   vLLM (Qwen3-30B)                      │    │
+│  │                   本地部署的 LLM 服务                      │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-## 技术栈
+### 技术栈
 
-### 客户端
+#### 客户端
 | 组件 | 技术 | 说明 |
 |------|------|------|
 | UI 框架 | PySide6 | Qt for Python，跨平台桌面 UI |
@@ -80,7 +468,7 @@ A cute cross-platform desktop pet assistant application with AI-powered conversa
 | 自动化工具 | PyAutoGUI | 工具调用中的鼠标键盘操作 |
 | 系统工具 | ctypes, subprocess | DPI 感知、系统命令执行 |
 
-### 服务器端
+#### 服务器端
 | 组件 | 技术 | 说明 |
 |------|------|------|
 | Web 框架 | FastAPI | 高性能 Python Web 框架 |
@@ -90,7 +478,7 @@ A cute cross-platform desktop pet assistant application with AI-powered conversa
 | 提示词框架 | LangChain | Chain 组合与检索 |
 | 联网搜索 | Tavily | 实时信息检索 |
 
-## 项目结构
+### 项目结构
 
 ```
 local_pet/
@@ -99,17 +487,17 @@ local_pet/
 │   ├── link_model.py              # 模型连接层
 │   │   ├── ChatAgent              # 对话代理（单例模式）
 │   │   │   ├── 流式对话处理        # ask_stream() 支持 SSE
-│   │   │   ├── 工具调用解析        # XML 标签格式
+│   │   │   ├── 工具调用解析        # XML 标签格式解析
 │   │   │   ├── 记忆摘要更新        # update_history_memory()
 │   │   │   └── 系统提示词管理      # update_system_prompt()
 │   │   └── LocalLLM              # HTTP 客户端
 │   ├── window_tool.py             # 工具执行器（单例模式）
-│   │   ├── open_app()             # 启动应用程序
-│   │   ├── type_text()            # 模拟键盘输入
-│   │   ├── click()                # 鼠标点击
-│   │   ├── run_shell()            # 执行 Shell 命令
-│   │   ├── press_keys()           # 快捷键操作
-│   │   ├── open_url()            # 打开网址
+│   │   ├── open_app()            # 启动应用程序
+│   │   ├── type_text()           # 模拟键盘输入
+│   │   ├── click()               # 鼠标点击
+│   │   ├── run_shell()           # 执行 Shell 命令
+│   │   ├── press_keys()          # 快捷键操作
+│   │   ├── open_url()           # 打开网址
 │   │   ├── get_current_address() # 获取当前位置
 │   │   ├── get_today_weather()  # 查询今日天气
 │   │   ├── get_future_weather() # 查询天气预报
@@ -122,57 +510,57 @@ local_pet/
 │   ├── ai_agent.py               # AI Agent（预留）
 │   ├── config/                   # 配置文件
 │   │   ├── setting.ini           # 主配置
-│   │   │   ├── [Url]             # 服务器地址
-│   │   │   ├── [SessionID]       # 会话标识
-│   │   │   ├── [General_Set]     # 当前宠物索引
-│   │   │   ├── [Memory]          # 记忆存储
-│   │   │   └── [Nick_Name]       # 宠物昵称
+│   │   │   ├── [Url]            # 服务器地址
+│   │   │   ├── [SessionID]      # 会话标识
+│   │   │   ├── [General_Set]    # 当前宠物索引
+│   │   │   ├── [Memory]         # 记忆存储
+│   │   │   └── [Nick_Name]      # 宠物昵称
 │   │   ├── pet_config_private.ini # 宠物外观配置
 │   │   ├── string_table.json     # 对话模板与角色定义
 │   │   └── holiday.json          # 节日数据
 │   ├── ui/                       # UI 模块
-│   │   ├── mainUi.py             # 主窗口 UI
+│   │   ├── mainUi.py            # 主窗口 UI
 │   │   ├── chat_ui.py           # 聊天界面
-│   │   ├── favor.py              # 好感度管理
-│   │   ├── login.py              # 登录窗口
-│   │   ├── memoryDialog.py       # 记忆编辑
-│   │   ├── messageInfo.py        # 消息列表模型
-│   │   ├── messageUi.py          # 消息气泡组件
-│   │   └── loadingUi.py          # 加载动画覆盖层
+│   │   ├── favor.py             # 好感度管理
+│   │   ├── login.py             # 登录窗口
+│   │   ├── memoryDialog.py      # 记忆编辑
+│   │   ├── messageInfo.py       # 消息列表模型
+│   │   ├── messageUi.py         # 消息气泡组件
+│   │   └── loadingUi.py         # 加载动画覆盖层
 │   ├── pet_image/               # 宠物动画资源
-│   │   └── model1.gif            # 宠物 GIF 动画
+│   │   └── model1.gif           # 宠物 GIF 动画
 │   └── package.bat              # Nuitka 打包脚本
 │
 ├── backend/                      # 服务器端代码
 │   └── rag-milvus-project/
 │       ├── rag_server.py         # FastAPI 主服务
-│       │   ├── /chat             # 对话接口（支持流式）
-│       │   ├── /clear_history    # 清理会话历史
-│       │   └── /debug_history    # 调试接口
-│       ├── rag_chat.py           # RAG Chain 实现
-│       ├── ingest_data.py        # 向量数据导入
-│       ├── milvus_demo.db        # SQLite 元数据存储
-│       ├── system_prompt.json    # 系统提示词配置
-│       └── requirements.txt      # Python 依赖
+│       │   ├── /chat            # 对话接口（支持流式）
+│       │   ├── /clear_history   # 清理会话历史
+│       │   └── /debug_history   # 调试接口
+│       ├── rag_chat.py          # RAG Chain 实现
+│       ├── ingest_data.py       # 向量数据导入
+│       ├── milvus_demo.db       # SQLite 元数据存储
+│       ├── system_prompt.json   # 系统提示词配置
+│       └── requirements.txt     # Python 依赖
 │
 ├── web/                          # Web 前端
 │   ├── server.py                 # FastAPI 服务
 │   │   ├── /api/config          # 获取配置
-│   │   ├── /api/favor/list       # 宠物列表与好感度
-│   │   ├── /api/favor/select     # 切换宠物
-│   │   └── /api/favor/reset      # 重置设置
-│   ├── index.html                # 主页面
-│   ├── components.js             # 前端组件
-│   ├── window_tool.py           # Web 版工具
-│   └── config/                   # Web 配置
+│   │   ├── /api/favor/list      # 宠物列表与好感度
+│   │   ├── /api/favor/select    # 切换宠物
+│   │   └── /api/favor/reset     # 重置设置
+│   ├── index.html               # 主页面
+│   ├── components.js            # 前端组件
+│   ├── window_tool.py          # Web 版工具
+│   └── config/                 # Web 配置
 │
 ├── README.md
 └── .gitignore
 ```
 
-## 核心模块详解
+### 核心模块详解
 
-### ChatAgent 对话流程
+#### ChatAgent 对话流程
 
 ```
 用户输入
@@ -188,20 +576,20 @@ local_pet/
 ┌─────────────────────────────────────┐
 │  2. 发送请求到 vLLM 服务器           │
 │     POST /chat                      │
-│     - question: 用户问题            │
-│     - session_id: 会话标识          │
+│     - question: 用户问题             │
+│     - session_id: 会话标识           │
 │     - character: 当前角色 Key       │
-│     - memory: 记忆上下文            │
+│     - memory: 记忆上下文             │
 │     - image: Base64 图片数据        │
 └─────────────────┬───────────────────┘
                   │
                   ▼
 ┌─────────────────────────────────────┐
 │  3. 解析流式响应                    │
-│     - <think> 思考过程              │
-│     - <tool> 工具调用指令          │
-│     - <observation> 工具返回结果   │
-│     - <final answer> 最终回答      │
+│     - <think> 思考过程               │
+│     - <tool> 工具调用指令           │
+│     - <observation> 工具返回结果    │
+│     - <final answer> 最终回答       │
 └─────────────────┬───────────────────┘
                   │
           ┌───────┴───────┐
@@ -221,7 +609,7 @@ local_pet/
         显示最终回答
 ```
 
-### 工具调用协议
+#### 工具调用协议
 
 宠物使用 XML 标签与后端通信，示例：
 
@@ -236,26 +624,26 @@ local_pet/
 <final answer>已经为您设好闹钟了喵~ 记得准时起床哦！</final answer>
 ```
 
-### 记忆系统
+#### 记忆系统
 
 ```
-┌─────────────┐     定时触发      ┌─────────────┐
-│  聊天记录   │ ──────────────▶   │  LLM 摘要   │
-│  (logs/*.txt)│                  │  提取爱好等  │
-└─────────────┘                  └──────┬──────┘
-                                       │
-                                       ▼
-                              ┌─────────────┐
-                              │ setting.ini │
-                              │ [Memory]    │
-                              │ current_     │
-                              │ memory       │
-                              └─────────────┘
+┌─────────────┐   定时触发    ┌─────────────┐
+│ 聊天记录    │ ────────────▶ │ LLM 摘要    │
+│ (logs/*.txt)│              │ 提取爱好等   │
+└─────────────┘              └──────┬──────┘
+                                   │
+                                   ▼
+                          ┌─────────────┐
+                          │ setting.ini │
+                          │ [Memory]    │
+                          │ current_    │
+                          │ memory      │
+                          └─────────────┘
 ```
 
-## 配置说明
+### 配置说明
 
-### 客户端配置 (src/config/setting.ini)
+#### 客户端配置 (src/config/setting.ini)
 
 ```ini
 [Url]
@@ -276,7 +664,7 @@ current_memory = 主人：喜欢羽毛球；讨厌西红柿  # 记忆摘要
 current_file =                          # 当前日志文件索引
 ```
 
-### 角色配置 (src/config/string_table.json)
+#### 角色配置 (src/config/string_table.json)
 
 | Key | 说明 |
 |-----|------|
@@ -286,17 +674,15 @@ current_file =                          # 当前日志文件索引
 | `New_Character_*` | Web 端简化角色定义 |
 | `Summary_Prompt` | 记忆摘要提取的提示词模板 |
 
-## 运行方式
+### 运行方式
 
-### 环境要求
-
+#### 环境要求
 - Python 3.8+
 - Conda 环境（推荐）
 - Windows 10/11（桌面应用）
 - 网络可达远程服务器
 
-### 桌面应用
-
+#### 桌面应用
 ```bash
 # 激活 Conda 环境
 conda activate local_pet
@@ -308,8 +694,7 @@ cd src
 python main.py
 ```
 
-### Web 服务
-
+#### Web 服务
 ```bash
 # 进入 web 目录
 cd web
@@ -323,8 +708,7 @@ python server.py
 # 访问 http://localhost:8000
 ```
 
-### 后端服务（服务器部署）
-
+#### 后端服务（服务器部署）
 ```bash
 cd backend/rag-milvus-project
 
@@ -337,7 +721,7 @@ python -m vllm.entrypoints.openai.api_server \
 python rag_server.py
 ```
 
-## 构建打包
+### 构建打包
 
 ```bash
 cd src
@@ -354,9 +738,9 @@ python package.bat
 - `--windows-console-mode=force`: 保留控制台（调试用）
 - `--lto=yes`: 链接时优化
 
-## 依赖列表
+### 依赖列表
 
-### 客户端 (src/requirements.txt)
+#### 客户端 (src/requirements.txt)
 ```
 PySide6>=6.5.0
 requests>=2.28.0
@@ -366,7 +750,7 @@ lunar-python>=1.15
 chardet>=4.0.0
 ```
 
-### 后端 (backend/rag-milvus-project/requirements.txt)
+#### 后端 (backend/rag-milvus-project/requirements.txt)
 ```
 fastapi>=0.100.0
 uvicorn>=0.23.0
@@ -380,12 +764,12 @@ huggingface-hub>=0.19.0
 tavily-python>=0.3.0
 ```
 
-### Web (web/requirements.txt)
+#### Web (web/requirements.txt)
 ```
 fastapi>=0.100.0
 uvicorn>=0.23.0
 ```
 
-## 许可证
+### 许可证
 
 MIT License
