@@ -1,0 +1,551 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Pet Web</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 引入组件 -->
+    <script src="/static/components.js"></script>
+    <style>
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* 消息气泡动画 */
+        .message-enter-active, .message-leave-active {
+            transition: all 0.3s ease;
+        }
+        .message-enter-from, .message-leave-to {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        /* Markdown 样式微调 */
+        .markdown-body p {
+            margin-bottom: 0.5em;
+        }
+        .markdown-body pre {
+            background-color: #f1f5f9;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            overflow-x: auto;
+        }
+
+        /* 强制移除删除线样式 */
+        .markdown-body del,
+        .markdown-body s,
+        .markdown-body strike {
+            text-decoration: none !important;
+        }
+
+        /* 修复可能导致横线的其他样式 */
+        .markdown-body * {
+            text-decoration-line: none !important;
+        }
+        /* 恢复链接下划线 */
+        .markdown-body a {
+            text-decoration-line: underline !important;
+            color: #2563eb;
+        }
+
+        /* 模态框动画 */
+        .modal-enter-active, .modal-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .modal-enter-from, .modal-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col overflow-hidden">
+
+    <div id="app" class="flex-1 flex flex-col max-w-3xl mx-auto w-full bg-white shadow-xl h-full relative">
+
+        <!-- 顶部标题栏 -->
+        <div class="bg-white border-b p-4 flex items-center justify-between z-10">
+            <div class="flex items-center space-x-4">
+                <!-- Favor 按钮 -->
+                <button @click="showFavorModal = true" class="text-gray-600 hover:text-blue-500 transition-colors" title="角色设置">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                </button>
+                <!-- Memory 按钮 -->
+                <button @click="openMemoryModal" class="text-gray-600 hover:text-blue-500 transition-colors" title="记忆管理">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                </button>
+            </div>
+
+            <h1 class="text-lg font-bold text-gray-800 absolute left-1/2 transform -translate-x-1/2">Chat Assistant</h1>
+
+            <div class="text-sm text-gray-500 w-20 text-right" v-if="isThinking">输入中...</div>
+            <div class="w-20" v-else></div> <!-- 占位符保持居中 -->
+        </div>
+
+        <!-- 聊天记录区域 -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-4" ref="chatContainer">
+            <div v-for="(msg, index) in messages" :key="index" class="flex w-full" :class="msg.isUser ? 'justify-end' : 'justify-start'">
+
+                <!-- 机器人头像 -->
+                <div v-if="!msg.isUser" class="w-10 h-10 rounded-full bg-blue-100 flex-shrink-0 mr-3 overflow-hidden border border-gray-200">
+                    <!-- 动态绑定头像 -->
+                    <img :src="petHeadUrl" onerror="this.src='https://api.dicebear.com/7.x/bottts/svg?seed=Felix'" class="w-full h-full object-cover">
+                </div>
+
+                <!-- 消息气泡 -->
+                <div class="max-w-[80%] flex flex-col" :class="msg.isUser ? 'items-end' : 'items-start'">
+
+                    <!-- 图片消息 -->
+                    <div v-if="msg.image" class="mb-2 cursor-pointer transition-transform hover:scale-105" @click="previewImage(msg.image)">
+                        <img :src="msg.image" class="rounded-lg max-w-[200px] max-h-[200px] object-cover border border-gray-200 shadow-sm">
+                    </div>
+
+                    <!-- 文本消息 -->
+                    <div v-if="msg.text"
+                         class="px-4 py-2 rounded-2xl shadow-sm text-sm leading-relaxed break-words"
+                         :class="msg.isUser ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-gray-100 text-gray-800 rounded-tl-none'">
+                        <div v-if="!msg.isUser" class="markdown-body" v-html="renderMarkdown(msg.text)"></div>
+                        <div v-else>{{ msg.text }}</div>
+                    </div>
+
+                    <!-- 时间戳 -->
+                    <div class="text-xs text-gray-400 mt-1 px-1">
+                        {{ formatTime(msg.time) }}
+                    </div>
+                </div>
+
+                <!-- 用户头像 -->
+                <div v-if="msg.isUser" class="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 ml-3 overflow-hidden border border-gray-200">
+                    <img src="/static/assets/head1.png" onerror="this.src='https://api.dicebear.com/7.x/avataaars/svg?seed=Felix'" class="w-full h-full object-cover">
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部输入区域 -->
+        <div class="bg-white border-t p-4">
+            <!-- 图片预览缩略图 -->
+            <div v-if="pendingImage" class="mb-2 relative inline-block">
+                <img :src="pendingImage.url" class="h-16 w-16 object-cover rounded-lg border border-gray-300">
+                <button @click="removePendingImage" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600">×</button>
+            </div>
+
+            <div class="flex items-end space-x-2">
+                <!-- 图片上传按钮 -->
+                <button @click="triggerFileUpload" class="p-2 text-gray-500 hover:text-blue-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </button>
+                <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleFileUpload">
+
+                <!-- 文本输入框 -->
+                <textarea
+                    v-model="inputText"
+                    @keydown.enter.prevent="sendMessage"
+                    placeholder="输入消息..."
+                    class="flex-1 bg-gray-100 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all resize-none max-h-32"
+                    rows="1"
+                ></textarea>
+
+                <!-- 发送按钮 -->
+                <button
+                    @click="sendMessage"
+                    :disabled="!inputText.trim() && !pendingImage"
+                    class="p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 全屏图片预览模态框 -->
+        <div v-if="previewImageUrl" class="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center" @click="closePreview">
+            <div class="relative w-full h-full flex items-center justify-center overflow-hidden" @wheel.prevent="handleZoom">
+                <img
+                    :src="previewImageUrl"
+                    class="transition-transform duration-100 ease-out cursor-grab active:cursor-grabbing max-w-full max-h-full object-contain"
+                    :style="{ transform: `scale(${zoomLevel}) translate(${panX}px, ${panY}px)` }"
+                    @mousedown.stop="startPan"
+                    @mousemove.stop="panImage"
+                    @mouseup.stop="endPan"
+                    @click.stop
+                    @dblclick.stop="closePreview"
+                >
+                <!-- 关闭按钮 -->
+                <button @click="closePreview" class="absolute top-4 right-4 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-70">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 使用组件 -->
+        <favor-modal
+            :show="showFavorModal"
+            :pet-list="petList"
+            :current-pet-index="currentPetIndex"
+            @close="showFavorModal = false"
+            @select="selectPet"
+            @reset="resetSettings"
+        ></favor-modal>
+
+        <memory-modal
+            :show="showMemoryModal"
+            v-model="memoryContent"
+            @close="showMemoryModal = false"
+            @save="saveMemory"
+        ></memory-modal>
+
+    </div>
+
+    <script>
+        const { createApp, ref, nextTick, onMounted } = Vue;
+
+        createApp({
+            components: {
+                'favor-modal': FavorModal,
+                'memory-modal': MemoryModal
+            },
+            setup() {
+                // ... (原有状态保持不变)
+                const messages = ref([
+                    { text: "你好！我是你的 AI 助手，有什么可以帮你的吗？", isUser: false, time: new Date() }
+                ]);
+                const inputText = ref("");
+                const chatContainer = ref(null);
+                const fileInput = ref(null);
+                const pendingImage = ref(null);
+                const isThinking = ref(false);
+                const petHeadUrl = ref("/static/assets/liubai.png");
+
+                const previewImageUrl = ref(null);
+                const zoomLevel = ref(1);
+                const panX = ref(0);
+                const panY = ref(0);
+                const isPanning = ref(false);
+                const startX = ref(0);
+                const startY = ref(0);
+
+                // --- 新增状态 ---
+                const showFavorModal = ref(false);
+                const showMemoryModal = ref(false);
+                const petList = ref([]);
+                const currentPetIndex = ref(1);
+                const memoryContent = ref("");
+
+                // 获取配置 (合并了原有的 onMounted)
+                onMounted(async () => {
+                    await loadConfig();
+                    await loadPetList();
+                });
+
+                const loadConfig = async () => {
+                    try {
+                        const response = await fetch("/api/config");
+                        const data = await response.json();
+                        if (data.pet_head) {
+                            petHeadUrl.value = data.pet_head;
+                        }
+                    } catch (error) {
+                        console.error("Failed to load config:", error);
+                    }
+                };
+
+                // --- Favor 逻辑 ---
+                const loadPetList = async () => {
+                    try {
+                        const response = await fetch("/api/favor/list");
+                        const data = await response.json();
+                        petList.value = data.pets;
+                        currentPetIndex.value = data.current_index;
+                    } catch (error) {
+                        console.error("Failed to load pet list:", error);
+                    }
+                };
+
+                const selectPet = async (index) => {
+                    try {
+                        const response = await fetch("/api/favor/select", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ index: index })
+                        });
+                        const data = await response.json();
+                        if (data.status === "success") {
+                            currentPetIndex.value = index;
+                            petHeadUrl.value = data.new_head; // 更新头像
+                            showFavorModal.value = false;
+                            // 可以添加一个提示消息
+                            messages.value.push({
+                                text: `已切换到角色 ${index}`,
+                                isUser: false,
+                                time: new Date()
+                            });
+                        }
+                    } catch (error) {
+                        console.error("Failed to select pet:", error);
+                        alert("切换角色失败");
+                    }
+                };
+
+                const resetSettings = async () => {
+                    if (!confirm("确定要重置所有设置吗？这将清除记忆和好感度。")) return;
+
+                    try {
+                        const response = await fetch("/api/favor/reset", {
+                            method: "POST"
+                        });
+                        const data = await response.json();
+                        if (data.status === "success") {
+                            alert("设置已重置");
+                            // 重新加载配置
+                            await loadConfig();
+                            await loadPetList();
+                            showFavorModal.value = false;
+                        } else {
+                            alert("重置失败: " + data.message);
+                        }
+                    } catch (error) {
+                        console.error("Failed to reset settings:", error);
+                        alert("重置失败");
+                    }
+                };
+
+                // --- Memory 逻辑 ---
+                const openMemoryModal = async () => {
+                    try {
+                        const response = await fetch("/api/memory");
+                        const data = await response.json();
+                        memoryContent.value = data.memory;
+                        showMemoryModal.value = true;
+                    } catch (error) {
+                        console.error("Failed to load memory:", error);
+                        alert("加载记忆失败");
+                    }
+                };
+
+                const saveMemory = async () => {
+                    try {
+                        const response = await fetch("/api/memory", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ memory: memoryContent.value })
+                        });
+                        const data = await response.json();
+                        if (data.status === "success") {
+                            showMemoryModal.value = false;
+                            alert("记忆已保存");
+                        }
+                    } catch (error) {
+                        console.error("Failed to save memory:", error);
+                        alert("保存记忆失败");
+                    }
+                };
+
+                // ... (原有逻辑保持不变: scrollToBottom, formatTime, renderMarkdown, triggerFileUpload, handleFileUpload, removePendingImage, sendMessage, previewImage 等)
+
+                const scrollToBottom = () => {
+                    nextTick(() => {
+                        if (chatContainer.value) {
+                            chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+                        }
+                    });
+                };
+
+                const formatTime = (date) => {
+                    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                };
+
+                const renderMarkdown = (text) => {
+                    return marked.parse(text);
+                };
+
+                const triggerFileUpload = () => {
+                    fileInput.value.click();
+                };
+
+                const handleFileUpload = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const formData = new FormData();
+                    formData.append("file", file);
+
+                    try {
+                        const response = await fetch("/api/upload", {
+                            method: "POST",
+                            body: formData
+                        });
+                        const data = await response.json();
+                        pendingImage.value = {
+                            url: data.url,
+                            base64: data.base64
+                        };
+                    } catch (error) {
+                        console.error("Upload failed:", error);
+                        alert("图片上传失败");
+                    }
+                    event.target.value = "";
+                };
+
+                const removePendingImage = () => {
+                    pendingImage.value = null;
+                };
+
+                const sendMessage = async () => {
+                    if ((!inputText.value.trim() && !pendingImage.value) || isThinking.value) return;
+
+                    const userMsg = {
+                        text: inputText.value,
+                        image: pendingImage.value ? pendingImage.value.url : null,
+                        isUser: true,
+                        time: new Date()
+                    };
+                    messages.value.push(userMsg);
+
+                    const question = inputText.value;
+                    const imageBase64 = pendingImage.value ? pendingImage.value.base64.split(',')[1] : null;
+
+                    inputText.value = "";
+                    pendingImage.value = null;
+                    scrollToBottom();
+                    isThinking.value = true;
+
+                    const aiMsg = { text: "", isUser: false, time: new Date() };
+                    messages.value.push(aiMsg);
+
+                    try {
+                        const response = await fetch("/api/chat", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                question: question || "请分析这张图片",
+                                image: imageBase64
+                            })
+                        });
+
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            const chunk = decoder.decode(value);
+                            const lines = chunk.split("\n\n");
+
+                            for (const line of lines) {
+                                if (line.startsWith("data: ")) {
+                                    try {
+                                        const data = JSON.parse(line.slice(6));
+                                        if (data.content) {
+                                            aiMsg.text += data.content;
+                                            scrollToBottom();
+                                        } else if (data.error) {
+                                            aiMsg.text += `\n[错误: ${data.error}]`;
+                                        }
+                                    } catch (e) {
+                                        console.error("Parse error", e);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        aiMsg.text = "抱歉，连接服务器失败。";
+                    } finally {
+                        isThinking.value = false;
+                    }
+                };
+
+                const previewImage = (url) => {
+                    previewImageUrl.value = url;
+                    zoomLevel.value = 1;
+                    panX.value = 0;
+                    panY.value = 0;
+                };
+
+                const closePreview = () => {
+                    previewImageUrl.value = null;
+                };
+
+                const handleZoom = (event) => {
+                    const delta = event.deltaY > 0 ? 0.9 : 1.1;
+                    zoomLevel.value = Math.max(0.1, zoomLevel.value * delta);
+                };
+
+                const startPan = (event) => {
+                    isPanning.value = true;
+                    startX.value = event.clientX - panX.value;
+                    startY.value = event.clientY - panY.value;
+                };
+
+                const panImage = (event) => {
+                    if (!isPanning.value) return;
+                    panX.value = event.clientX - startX.value;
+                    panY.value = event.clientY - startY.value;
+                };
+
+                const endPan = () => {
+                    isPanning.value = false;
+                };
+
+                return {
+                    messages,
+                    inputText,
+                    chatContainer,
+                    fileInput,
+                    pendingImage,
+                    isThinking,
+                    petHeadUrl,
+                    previewImageUrl,
+                    zoomLevel,
+                    panX,
+                    panY,
+                    sendMessage,
+                    triggerFileUpload,
+                    handleFileUpload,
+                    removePendingImage,
+                    formatTime,
+                    renderMarkdown,
+                    previewImage,
+                    closePreview,
+                    handleZoom,
+                    startPan,
+                    panImage,
+                    endPan,
+                    // 新增
+                    showFavorModal,
+                    showMemoryModal,
+                    petList,
+                    currentPetIndex,
+                    memoryContent,
+                    selectPet,
+                    openMemoryModal,
+                    saveMemory,
+                    resetSettings
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

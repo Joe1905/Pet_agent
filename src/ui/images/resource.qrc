@@ -1,0 +1,28 @@
+<RCC>
+  <qresource prefix="btn">
+    <file>btn_plus.png</file>
+    <file>btn_plus_hover.png</file>
+    <file>btn_send_hover.png</file>
+    <file>btn_send.png</file>
+  </qresource>
+  <qresource prefix="favor">
+    <file>background_image.png</file>
+    <file>aixin.png</file>
+  </qresource>
+  <qresource prefix="load">
+    <file>thinking.gif</file>
+    <file>loading.gif</file>
+  </qresource>
+  <qresource prefix="input">
+    <file>bg.png</file>
+    <file>img_bubble2.png</file>
+    <file>img_bubble.png</file>
+    <file>img_input.png</file>
+  </qresource>
+  <qresource prefix="head">
+    <file>liubai.png</file>
+    <file>qirui.png</file>
+    <file>head1.png</file>
+    <file>head2.png</file>
+  </qresource>
+</RCC>

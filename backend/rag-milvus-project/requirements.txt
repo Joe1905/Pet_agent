@@ -1,0 +1,27 @@
+# 核心 Web 框架
+fastapi
+uvicorn
+pydantic
+
+# LangChain 及其集成插件
+langchain
+langchain-core
+langchain-community
+langchain-openai
+langchain-milvus
+langchain-huggingface
+
+# 向量数据库与搜索
+pymilvus>=2.4.2
+tavily-python
+
+# 文本处理与嵌入 (Embedding)
+sentence-transformers
+transformers
+# 注意：代码中强制使用 CPU 运行 Embedding 以节省 GPU 显存给 vLLM
+torch --index-url https://download.pytorch.org/whl/cpu
+
+# 其他工具
+httpx
+pytz
+python-dotenv
